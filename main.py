@@ -2,6 +2,7 @@ import argparse
 import os
 import subprocess
 from datetime import datetime
+from metrics import extract_metrics
 
 __version__ = "0.1"
 start_time = datetime.now()
@@ -14,6 +15,7 @@ operational_log = {
     # script_duration
     # status
 }
+metrics_log = None
 
 def is_qcli_installed():
     pass
@@ -40,6 +42,7 @@ video_path = args.v_path
 output_url = args.output_url
 
 try:
+    qcli_output = video_path + '.qctools.xml.gz'
     operational_log["video_size_bytes"] = os.path.getsize(video_path) # log video size
     cmd = ['qcli', '-i', video_path]
     qcli_start_time = datetime.now()
@@ -53,14 +56,20 @@ try:
             # if qcli not installed or os related error...
             operational_log["qcli_error"] = str(stderr)
         raise Exception
-
+    p.wait() # wait for qcli 
     operational_log["qcli_duration"] = (datetime.now() - qcli_start_time).total_seconds()
-    qcli_output = "./"
+    # TODO: calc qcli output size
+    metrics_start_time = datetime.now()
+    metrics_log = extract_metrics(qcli_output)
+    operational_log["metrics_extraction_duration"] = (datetime.now() - metrics_start_time).total_seconds()
+    send_log(metrics_log,output_url)
     operational_log["status"] = "success"
 except Exception as e:
     operational_log["status"] = "failed"
     operational_log["error"] = str(e)
 finally:
+    if os.path.exists(qcli_output): # delete qcli output
+        os.remove(qcli_output)
     operational_log["total_duration"] = (datetime.now() - start_time).total_seconds()
     send_log(operational_log,output_url)
 
